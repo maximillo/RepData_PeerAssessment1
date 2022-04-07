@@ -4,22 +4,101 @@ output:
   html_document:
     keep_md: true
 ---
+##Load library
+```{r}
+library(tidyverse)
+```
 
 
 ## Loading and preprocessing the data
+```{r}
+if(!file.exists("activity.zip")) {
+        temp <- tempfile()
+        download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip",temp)
+        unzip(temp)
+        unlink(temp)
+}
+
+activity <- read.csv("activity.csv") %>% 
+  mutate(date=as.POSIXct(date, "%Y-%m-%d"), weekday=weekdays(date)) 
+
+head(activity)
+```
+
+## Histogram of the total number of steps taken each day
+```{r}
+activity_daily_grouped <- activity %>% drop_na() %>% 
+  group_by(date) %>%
+  summarise(totalSteps = sum(steps))
+```
 
 
+```{r}
+ggplot(activity_daily_grouped, aes(x=totalSteps)) + geom_histogram()
+```
 
-## What is mean total number of steps taken per day?
+## What is mean/median total number of steps taken per day?
+```{r}
+mean(activity_daily_grouped$totalSteps)
+median(activity_daily_grouped$totalSteps)
+```
 
+## Time series plot of the average number of steps taken
 
+```{r}
+avg_daily_activity <- activity %>% drop_na() %>% 
+  group_by(interval) %>% 
+  summarise(avgSteps=mean(steps))
+```
 
-## What is the average daily activity pattern?
-
+```{r}
+ggplot(avg_daily_activity, aes(x=interval, y=avgSteps)) + geom_line()
+```
 
 
 ## Imputing missing values
+```{r}
+sum(is.na(activity$steps))
 
+# Replace the NAs with mean
+imputed_activity <- activity %>% 
+  group_by(interval) %>% 
+  mutate(steps = ifelse(is.na(steps), mean(steps, na.rm=TRUE), steps))
+```
+```{r}
+imputed_daily_total <- imputed_activity %>% 
+  group_by(date) %>%
+  summarise(totalSteps = sum(steps))
+
+ggplot(imputed_daily_total , aes(x=totalSteps)) + geom_histogram()
+
+```
+```{r}
+mean(imputed_daily_total$totalSteps)
+median(imputed_daily_total$totalSteps)
+```
 
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+```{r}
+activity_dayType <- imputed_activity %>% 
+  mutate(dayType= ifelse(weekday=="Saturday" | weekday=="Sunday", "Weekend", "Weekday"))
+
+avg_activity_dayType <- activity_dayType %>% 
+  group_by(dayType, interval) %>% 
+  summarise(avgSteps=mean(steps))
+
+head(avg_activity_dayType)
+```
+
+
+```{r}
+
+ggplot(avg_activity_dayType, aes(x=interval, y=avgSteps, color=dayType)) + 
+  geom_line() + 
+  facet_grid(~dayType) +
+  labs(title = "Average daily steps", x = "Interval", y = "Average number of steps")
+```
+
+
